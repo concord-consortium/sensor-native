@@ -2,15 +2,30 @@
 #define _GOIO_DLL_INTERFACE_H_
 
 /***************************************************************************************************************************
+
 	This file documents the 'C' interface to GoIO_DLL.
 
 	This library is implemented as GoIO_DLL.dll on Windows and as libGoIO_DLL.dylib on the Mac.
+
+	Go! Link, Go! Temp, Go! Motion, and Vernier Mini GC	devices may be accessed by this library.
+
+	The Vernier Mini GC device is implemented internally as a Go! Link interface with a fixed GC sensor plugged in, so most
+	of the comments describing the Go! Link interface apply to the Mini GC as well. The Mini GC does have its own USB 
+	product id so it can be distinguished from a Go! Link.
 	
 ***************************************************************************************************************************/
+#ifdef TARGET_OS_LINUX
+#ifdef __cplusplus
+	#define GOIO_DLL_INTERFACE_DECL extern "C" __attribute__ ((visibility("default")))
+#else
+	#define GOIO_DLL_INTERFACE_DECL __attribute__ ((visibility("default")))
+#endif
+#else
 #ifdef __cplusplus
 	#define GOIO_DLL_INTERFACE_DECL extern "C"
 #else
 	#define GOIO_DLL_INTERFACE_DECL
+#endif
 #endif
 
 #include "GSkipCommExt.h"
@@ -19,7 +34,9 @@
 
 #ifdef TARGET_OS_MAC
 	#define GOIO_MAX_SIZE_DEVICE_NAME 255
-#else
+#endif
+
+#if defined (TARGET_OS_WIN) || defined (TARGET_OS_LINUX)
 	#define GOIO_MAX_SIZE_DEVICE_NAME 260
 #endif
 
@@ -30,9 +47,10 @@ typedef short gtype_int16;
 typedef unsigned short gtype_uint16;
 typedef int gtype_int32;
 
-#define SKIP_TIMEOUT_MS_DEFAULT 1000
+#define SKIP_TIMEOUT_MS_DEFAULT 2000
 #define SKIP_TIMEOUT_MS_READ_DDSMEMBLOCK 2000
 #define SKIP_TIMEOUT_MS_WRITE_DDSMEMBLOCK 4000
+
 
 /***************************************************************************************************************************
 	Function Name: GoIO_Init()
@@ -96,7 +114,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetDLLVersion(
 	Function Name: GoIO_UpdateListOfAvailableDevices()
 	
 	Purpose:	This routine queries the operating system to build a list of available devices
-				that have the specified USB vendor id and product id. Only Go! Link, Go! Temp, and Go! Motion
+				that have the specified USB vendor id and product id. Only Go! Link, Go! Temp, Go! Motion, and Vernier Mini GC
 				vendor and product id's are supported.
 
 	Return:		number of devices found.
@@ -140,11 +158,14 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetNthAvailableDeviceName(
 					SKIP_CMD_ID_INIT,
 					SKIP_CMD_ID_READ_LOCAL_NV_MEM. - read DDS record
 
-				The following commands are sent to Go! Link devices:
+				The following commands are sent to Go! Link and Vernier Mini GC devices:
 					SKIP_CMD_ID_INIT,
 					SKIP_CMD_ID_GET_SENSOR_ID,
 					SKIP_CMD_ID_READ_REMOTE_NV_MEM, - read DDS record if this is a 'smart' sensor
 					SKIP_CMD_ID_SET_ANALOG_INPUT_CHANNEL. - based on sensor EProbeType
+
+				SKIP_CMD_ID_GET_SENSOR_ID is superfluous when sent to the Mini GC, but the Mini GC is implemented internally
+				as a Go! Link with a fixed sensor plugged in.
 
 				Only SKIP_CMD_ID_INIT is sent to Go! Motion. Go! Motion does not contain DDS memory, but this routine
 				initializes the sensor's associated DDS memory record with calibrations for both meters and feet.
@@ -281,6 +302,45 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmdAndGetResponse(
 							//times are less than 50 milliseconds. See SKIP_TIMEOUT_MS_* definitions.
 
 /***************************************************************************************************************************
+	Function Name: GoIO_Sensor_SendCmd()
+	
+	Purpose:	GoIO_Sensor_SendCmd() is an advanced function. You should usually use 
+				GoIO_Sensor_SendCmdAndGetResponse() instead. After calling GoIO_Sensor_SendCmd(), you must call
+				GoIO_Sensor_GetNextResponse() before sending any more commands to the device.
+
+				The main reason that GoIO_Sensor_SendCmd() is made available to the user is to allow a program to send
+				SKIP_CMD_ID_START_MEASUREMENTS commands to several different devices as close together as possible so that
+				measurements start at about the same time on separate devices.
+	
+	Return:		0 if successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmd(
+	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
+	unsigned char cmd,	//[in] command code
+	void *pParams,			//[in] ptr to cmd specific parameter block, may be NULL. See GSkipCommExt.h.
+	gtype_int32 nParamBytes);//[in] # of bytes in (*pParams).
+
+/***************************************************************************************************************************
+	Function Name: GoIO_Sensor_GetNextResponse()
+	
+	Purpose:	GoIO_Sensor_GetNextResponse() is an advanced function. You should usually use 
+				GoIO_Sensor_SendCmdAndGetResponse() instead. After calling GoIO_Sensor_SendCmd(), you must call
+				GoIO_Sensor_GetNextResponse() before sending any more commands to the device.
+
+
+	Return:		0 if successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetNextResponse(
+	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
+	void *pRespBuf,				//[out] ptr to destination buffer, may be NULL. See GSkipCommExt.h.
+	gtype_int32 *pnRespBytes,	//[in, out] ptr to size of of pRespBuf buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	unsigned char *pCmd,		//[out] identifies which command this response is for. Ptr must NOT be NULL!
+	gtype_int32 *pErrRespFlag,	//[out] flag(1 or 0) indicating that the response contains error info. Ptr must NOT be NULL!
+	gtype_int32 nTimeoutMs);	//[in] # of milliseconds to wait before giving up.
+
+/***************************************************************************************************************************
 	Function Name: GoIO_Sensor_GetMeasurementTickInSeconds()
 	
 	Purpose:	The measurement period for Go! devices is specified in discrete 'ticks', so the actual time between 
@@ -374,6 +434,7 @@ GOIO_DLL_INTERFACE_DECL gtype_real64 GoIO_Sensor_GetMeasurementPeriod(
 				-----------------               --------------------------------
 				Go! Temp                        ~510 milliseconds
 				Go! Link                        ~10 milliseconds
+				Mini GC                         ~10 milliseconds
 				Go! Motion                      ~ measurement period + 10 milliseconds
 
 				The 10 millisecond delay specifed for Go! Link is just the approximate delay required for the
