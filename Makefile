@@ -17,8 +17,6 @@ SWIG_OUTPUT_DIR = src/swig/java
 # like this is needed: -isysroot /Developer/SDKs/MacOSX10.4.sdk -Wl,-syslibroot,/Developer/SDKs/MacOSX10.4.sdk 
 OSX_LINK_FLAGS = -bind_at_load -framework IOKit -framework Cocoa -framework Carbon -I/System/Library/Frameworks/JavaVM.framework/Headers -arch i386 -arch ppc -arch x86_64
 
-# -arch i386 -arch ppc -arch x86_64
-
 # this is used to build native test executables
 # this filter grabs the .o and .lib files from the dependency list
 define build-static-executable
@@ -72,7 +70,9 @@ bin/GoLinkPrintData : $(GOLINK_OBJS) $(PRINTDATA_OBJS) bin
 	$(build-static-executable)
 
 vernier_lipo : 
-	lipo bin/libvernier_ccsd-macintel.jnilib bin/libvernier_ccsd-ppc.jnilib -output bin/libvernier_ccsd.jnilib -create
+	lipo -extract ppc7400 bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_ppc7400.jnilib
+	lipo -extract i386    bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_i386.jnilib
+	lipo -extract x86_64  bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_x86_64.jnilib
 
 ######## TI targets ############
 ti_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/ti
