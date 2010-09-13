@@ -1,29 +1,35 @@
-CFLAGS = -Iinclude -Ivernier_goio_sdk
+CFLAGS = -Iinclude -Ivernier_goio_sdk -DTARGET_OS_MAC -arch i386 -arch ppc -arch x86_64
 
-# NOTE different versions of swig change the names of the generated methods.  If a new
-# so the same version of swig needs to be used to generate the Java code and the 
-# native code.
+CC=g++
+
 SWIG = swig
-#SWIG = /cygdrive/c/swig-1.3.21/swig
+# SWIG = /cygdrive/c/swig-1.3.21/swig
 
 QUERY_OBJS = nativelib/test/QueryDevice.o nativelib/test/CCSensorUtils.o 
 PRINTDATA_OBJS = nativelib/test/PrintData.o nativelib/test/CCSensorUtils.o 
 PSEUDO_OBJS = nativelib/PseudoSensorDevice.o
-GOLINK_OBJS = nativelib/GoLinkSensorDevice.o vernier_goio_sdk/GoIO_DLL.lib
 TI_OBJS = nativelib/TISensorDevice.o
 
 SWIG_OUTPUT_DIR = src/swig/java
 
+#OSX_LINK_FLAGS = -framework IOKit -framework CoreFoundation -framework CoreServices -framework Carbon -lstdc++
+# scytacki: To compile this for older operating systems something 
+# like this is needed: -isysroot /Developer/SDKs/MacOSX10.4.sdk -Wl,-syslibroot,/Developer/SDKs/MacOSX10.4.sdk 
+OSX_LINK_FLAGS = -bind_at_load -framework IOKit -framework Cocoa -framework Carbon -I/System/Library/Frameworks/JavaVM.framework/Headers -arch i386 -arch ppc -arch x86_64
+
+# -arch i386 -arch ppc -arch x86_64
+
 # this is used to build native test executables
 # this filter grabs the .o and .lib files from the dependency list
 define build-static-executable
-gcc -o $@ $(filter %.o %.lib,$^)  
+$(CC) -o $@  $(filter %.o %.lib %.a %.dylib ,$^)  $(OSX_LINK_FLAGS)
 endef
 
 # this builds a jni comptable dll with gcc
 # this filter grabs the .o and .lib files from the dependency list
 define build-jni-dll
-g++ -mno-cygwin -shared $(filter %.o %.lib,$^) -Wl,--add-stdcall-alias -o $@
+$(CC) -bundle $(filter %.o %.lib %.a,$^) -o $@ -framework JavaVM $(OSX_LINK_FLAGS)
+#gcc -bundle $(filter %.o %.lib %.dylib,$^) -o $@ -framework JavaVM
 endef
 
 all: vernier_swig
@@ -31,42 +37,47 @@ all: vernier_swig
 nativelib/test/%.o : src/c/test/%.c include/CCSensorDevice.h src/c/test/CCSensorUtils.h nativelib/test
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# g++ is used because otherwise the c compiler is used for this file, but the jenv structure is not 
-# included correctly for the compiler.  If you switch g++ to $(CC) you can see the errors.
 nativelib/swig/%.o : src/swig/%.c nativelib/swig
-	g++ -c $< -I/usr/java/include -I/usr/java/include/win32 -Iinclude -o $@
+	$(CC) -c $< -I/System/Library/Frameworks/JavaVM.framework/Headers -Iinclude -o $@
+#  This was used to force the native library to use the 1.3.1 headers, I think 
+#    this was need before, but now 1.4 is required.
+#	$(CC) -c $< -I/System/Library/Frameworks/JavaVM.framework/Versions/1.3.1/Headers -Iinclude -o $@
 
 nativelib/%.o : src/c/%.c include/CCSensorDevice.h nativelib nativelib/test
-	g++ $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
-bin nativelib nativelib/test nativelib/swig $(SWIG_OUTPUT_DIR)/ccsd/vernier $(SWIG_OUTPUT_DIR)/ccsd/pseudo $(SWIG_OUTPUT_DIR)/ccsd/ti:
+bin bin/local nativelib nativelib/test nativelib/swig $(SWIG_OUTPUT_DIR)/ccsd/vernier $(SWIG_OUTPUT_DIR)/ccsd/pseudo $(SWIG_OUTPUT_DIR)/ccsd/ti:
 	mkdir -p $@
 
-.PHONY : vernier_swig ti_swig pseudo_swig
+.PHONY : vernier_swig ti_swig pseudo_swig vernier_lipo
 
 # you must install swig to run this target. http://swig.org
 # it expects the binary to be on your path and the include files to
 # be in a stardard include folder.
 
 ######### Vernier targets ###########
-vernier_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/vernier
-	$(SWIG) -java -c++ -Iinclude -package ccsd.vernier -outdir src/swig/java/ccsd/vernier -o src/swig/VernierSensorDevice_wrap.cpp src/swig/CCSensorDevice.i  
+GOLINK_OBJS = nativelib/GoLinkSensorDevice.o vernier_goio_sdk/libGoIO_DLL.a
+#GOLINK_OBJS = nativelib/GoLinkSensorDevice.o vernier_goio_sdk/libGoIO_DLL.dylib
 
-# the vernier_swig dep is commented out because running it producers a _wrap file which can't be
-# compiled.
-bin/vernier_ccsd.dll : 	$(GOLINK_OBJS) nativelib/swig/VernierSensorDevice_wrap.o bin
+vernier_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/vernier
+	$(SWIG) -java -c++ -Iinclude -package ccsd.vernier -outdir src/swig/java/ccsd/vernier -o src/swig/VernierSensorDevice_wrap.c src/swig/CCSensorDevice.i  
+
+bin/local/libvernier_ccsd.jnilib : 	$(GOLINK_OBJS) nativelib/swig/VernierSensorDevice_wrap.o bin/local
 	$(build-jni-dll)
 
 bin/GoLinkQuery : $(QUERY_OBJS) $(GOLINK_OBJS) bin
 	$(build-static-executable)
-
+ 
 bin/GoLinkPrintData : $(GOLINK_OBJS) $(PRINTDATA_OBJS) bin
 	$(build-static-executable)
+
+vernier_lipo : 
+	lipo bin/libvernier_ccsd-macintel.jnilib bin/libvernier_ccsd-ppc.jnilib -output bin/libvernier_ccsd.jnilib -create
 
 ######## TI targets ############
 ti_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/ti
 	$(SWIG) -java -Iinclude -package ccsd.ti -outdir src/swig/java/ccsd/ti -o src/swig/TISensorDevice_wrap.c src/swig/CCSensorDevice.i  
-	
+
 bin/ti_ccsd.dll : 	ti_swig $(TI_OBJS) nativelib/swig/TISensorDevice_wrap.o bin
 	$(build-jni-dll)
 
