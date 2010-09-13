@@ -2,27 +2,30 @@
 #define _GOIO_DLL_INTERFACE_H_
 
 /***************************************************************************************************************************
-	GoIO_DLL_interface.h version 1.60
 
-	This file documents the 'C' interface to GoIO_DLL.dll .
+	This file documents the 'C' interface to GoIO_DLL.
+
+	This library is implemented as GoIO_DLL.dll on Windows and as libGoIO_DLL.dylib on the Mac.
+
+	Go! Link, Go! Temp, Go! Motion, and Vernier Mini GC	devices may be accessed by this library.
+
+	The Vernier Mini GC device is implemented internally as a Go! Link interface with a fixed GC sensor plugged in, so most
+	of the comments describing the Go! Link interface apply to the Mini GC as well. The Mini GC does have its own USB 
+	product id so it can be distinguished from a Go! Link.
 	
 ***************************************************************************************************************************/
+#ifdef TARGET_OS_LINUX
 #ifdef __cplusplus
-	#ifdef TARGET_OS_MAC
-		#define GOIO_DLL_INTERFACE_DECL extern "C"
-	#else
-		#ifdef _GOIO_DLL_SRC
-		#define GOIO_DLL_INTERFACE_DECL extern "C" _declspec(dllexport)
-		#else
-		#define GOIO_DLL_INTERFACE_DECL extern "C" _declspec(dllimport)
-		#endif
-	#endif
+	#define GOIO_DLL_INTERFACE_DECL extern "C" __attribute__ ((visibility("default")))
 #else
-	#ifdef TARGET_OS_MAC
-		#define GOIO_DLL_INTERFACE_DECL
-	#else
-        #define GOIO_DLL_INTERFACE_DECL __declspec(dllimport)		
-	#endif
+	#define GOIO_DLL_INTERFACE_DECL __attribute__ ((visibility("default")))
+#endif
+#else
+#ifdef __cplusplus
+	#define GOIO_DLL_INTERFACE_DECL extern "C"
+#else
+	#define GOIO_DLL_INTERFACE_DECL
+#endif
 #endif
 
 #include "GSkipCommExt.h"
@@ -31,8 +34,10 @@
 
 #ifdef TARGET_OS_MAC
 	#define GOIO_MAX_SIZE_DEVICE_NAME 255
-#else
-	#define GOIO_MAX_SIZE_DEVICE_NAME _MAX_PATH
+#endif
+
+#if defined (TARGET_OS_WIN) || defined (TARGET_OS_LINUX)
+	#define GOIO_MAX_SIZE_DEVICE_NAME 260
 #endif
 
 typedef void *GOIO_SENSOR_HANDLE;
@@ -42,9 +47,10 @@ typedef short gtype_int16;
 typedef unsigned short gtype_uint16;
 typedef int gtype_int32;
 
-#define SKIP_TIMEOUT_MS_DEFAULT 1000
+#define SKIP_TIMEOUT_MS_DEFAULT 2000
 #define SKIP_TIMEOUT_MS_READ_DDSMEMBLOCK 2000
 #define SKIP_TIMEOUT_MS_WRITE_DDSMEMBLOCK 4000
+
 
 /***************************************************************************************************************************
 	Function Name: GoIO_Init()
@@ -75,10 +81,40 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Init();
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Uninit();
 
 /***************************************************************************************************************************
+	Function Name: GoIO_GetDLLVersion()
+		Added in version 2.00.
+	
+	Purpose:	This routine returns the major and minor version numbers for the instance of GoIO_DLL that is
+				currently running.
+
+				If a function is not guaranteed to be present in all supported versions of GoIO_DLL, then the line
+				"Added in version 'major.minor'" will appear in the function description in this file.
+
+				It is our intention that all versions of GoIO_DLL created subsequent to a given version, will be
+				backwards compatible with the older version. You should be able to replace an old version of GoIO_DLL
+				with a newer version and everything should still work without rebuilding your application.
+
+				Note that version major2.minor2 is later than version major1.minor1 
+				iff. ((major2 > major1) || ((major2 == major1) && (minor2 > minor1))).
+				
+				Backwards compatibility is definitely our intention, but we do not absolutely guarantee it. If you think
+				that you have detected a backwards compatibility bug, then please report it to Vernier Software & Technology.
+				Calling GoIO_GetVersion() from your application is a way to identify precisely which version of
+				GoIO_DLL you are actually using.
+
+
+	Return:		0 iff successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetDLLVersion(
+	gtype_uint16 *pMajorVersion, //[o]
+	gtype_uint16 *pMinorVersion); //[o]
+
+/***************************************************************************************************************************
 	Function Name: GoIO_UpdateListOfAvailableDevices()
 	
 	Purpose:	This routine queries the operating system to build a list of available devices
-				that have the specified USB vendor id and product id. Only Go! Link and Go! Temp
+				that have the specified USB vendor id and product id. Only Go! Link, Go! Temp, Go! Motion, and Vernier Mini GC
 				vendor and product id's are supported.
 
 	Return:		number of devices found.
@@ -113,18 +149,26 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_GetNthAvailableDeviceName(
 				If the device is already open, then this routine will fail.
 
 				In addition to establishing basic communication with the device, this routine will initialize the
-				device. If a smart sensor is attached to the Go! device, then this routine will query the device for
-				the DDS sensor configuration parameters.
+				device. Each GOIO_SENSOR_HANDLE sensor object has an associated DDS memory record. If the physical 
+				sensor being opened is a 'smart' sensor with its own physical DDS memory, then this routine will copy
+				the contents of the memory on the device to the sensor object's DDS memory record. If the physical 
+				sensor does not have DDS memory, then the associated DDS memory record is set to default values.
 
 				The following commands are sent to Go! Temp devices:
 					SKIP_CMD_ID_INIT,
 					SKIP_CMD_ID_READ_LOCAL_NV_MEM. - read DDS record
 
-				The following commands are sent to Go! Link devices:
+				The following commands are sent to Go! Link and Vernier Mini GC devices:
 					SKIP_CMD_ID_INIT,
 					SKIP_CMD_ID_GET_SENSOR_ID,
 					SKIP_CMD_ID_READ_REMOTE_NV_MEM, - read DDS record if this is a 'smart' sensor
 					SKIP_CMD_ID_SET_ANALOG_INPUT_CHANNEL. - based on sensor EProbeType
+
+				SKIP_CMD_ID_GET_SENSOR_ID is superfluous when sent to the Mini GC, but the Mini GC is implemented internally
+				as a Go! Link with a fixed sensor plugged in.
+
+				Only SKIP_CMD_ID_INIT is sent to Go! Motion. Go! Motion does not contain DDS memory, but this routine
+				initializes the sensor's associated DDS memory record with calibrations for both meters and feet.
 
 				Since the device stops sending measurements in response to SKIP_CMD_ID_INIT, an application must send
 				SKIP_CMD_ID_START_MEASUREMENTS to the device in order to receive measurements.
@@ -248,7 +292,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_ClearIO(
 ****************************************************************************************************************************/
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmdAndGetResponse(
 	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
-	unsigned char cmd,		//[in] command code. See SKIP_CMD_ID_* in GSkipComm.h.
+	unsigned char cmd,		//[in] command code. See SKIP_CMD_ID_* in GSkipCommExt.h.
 	void *pParams,			//[in] ptr to cmd specific parameter block, may be NULL. See GSkipCommExt.h.
 	gtype_int32 nParamBytes,//[in] # of bytes in (*pParams).
 	void *pRespBuf,			//[out] ptr to destination buffer, may be NULL. See GSkipCommExt.h.
@@ -256,6 +300,45 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmdAndGetResponse(
 	gtype_int32 timeoutMs);	//[in] # of milliseconds to wait for a reply before giving up. Go! devices should reply to almost all the 
 							//currently defined commands within SKIP_TIMEOUT_MS_DEFAULT(1000) milliseconds. In fact, typical response
 							//times are less than 50 milliseconds. See SKIP_TIMEOUT_MS_* definitions.
+
+/***************************************************************************************************************************
+	Function Name: GoIO_Sensor_SendCmd()
+	
+	Purpose:	GoIO_Sensor_SendCmd() is an advanced function. You should usually use 
+				GoIO_Sensor_SendCmdAndGetResponse() instead. After calling GoIO_Sensor_SendCmd(), you must call
+				GoIO_Sensor_GetNextResponse() before sending any more commands to the device.
+
+				The main reason that GoIO_Sensor_SendCmd() is made available to the user is to allow a program to send
+				SKIP_CMD_ID_START_MEASUREMENTS commands to several different devices as close together as possible so that
+				measurements start at about the same time on separate devices.
+	
+	Return:		0 if successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_SendCmd(
+	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
+	unsigned char cmd,	//[in] command code
+	void *pParams,			//[in] ptr to cmd specific parameter block, may be NULL. See GSkipCommExt.h.
+	gtype_int32 nParamBytes);//[in] # of bytes in (*pParams).
+
+/***************************************************************************************************************************
+	Function Name: GoIO_Sensor_GetNextResponse()
+	
+	Purpose:	GoIO_Sensor_GetNextResponse() is an advanced function. You should usually use 
+				GoIO_Sensor_SendCmdAndGetResponse() instead. After calling GoIO_Sensor_SendCmd(), you must call
+				GoIO_Sensor_GetNextResponse() before sending any more commands to the device.
+
+
+	Return:		0 if successful, else -1.
+
+****************************************************************************************************************************/
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetNextResponse(
+	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
+	void *pRespBuf,				//[out] ptr to destination buffer, may be NULL. See GSkipCommExt.h.
+	gtype_int32 *pnRespBytes,	//[in, out] ptr to size of of pRespBuf buffer on input, size of response on output, may be NULL if pRespBuf is NULL.
+	unsigned char *pCmd,		//[out] identifies which command this response is for. Ptr must NOT be NULL!
+	gtype_int32 *pErrRespFlag,	//[out] flag(1 or 0) indicating that the response contains error info. Ptr must NOT be NULL!
+	gtype_int32 nTimeoutMs);	//[in] # of milliseconds to wait before giving up.
 
 /***************************************************************************************************************************
 	Function Name: GoIO_Sensor_GetMeasurementTickInSeconds()
@@ -313,7 +396,7 @@ GOIO_DLL_INTERFACE_DECL gtype_real64 GoIO_Sensor_GetMaximumMeasurementPeriod(
 				This routine will fail if we are currently collecting measurements from the sensor. Note that collection
 				is started by sending SKIP_CMD_ID_START_MEASUREMENTS to the sensor, and stopped by sending 
 				SKIP_CMD_ID_STOP_MEASUREMENTS.
-	
+
 	Return:		0 if successful, else -1.
 
 ****************************************************************************************************************************/
@@ -344,16 +427,31 @@ GOIO_DLL_INTERFACE_DECL gtype_real64 GoIO_Sensor_GetMeasurementPeriod(
 				GoIO Measurement Buffer. A separate GoIO Measurement Buffer is maintained for each
 				open sensor.
 
-				The first measurement is sent almost immediatedly after SKIP_CMD_ID_START_MEASUREMENTS
-				is issued. Subsequent measurements are sent at the currently configured measurement
-				period interval. See GoIO_Sensor_SetMeasurementPeriod().
+				The delay between sending SKIP_CMD_ID_START_MEASUREMENTS and the appearance of the first
+				measurement in the GoIO Measurement Buffer varies according to the type of Go! device.
+
+				Go! device type	                Delay before first measurement
+				-----------------               --------------------------------
+				Go! Temp                        ~510 milliseconds
+				Go! Link                        ~10 milliseconds
+				Mini GC                         ~10 milliseconds
+				Go! Motion                      ~ measurement period + 10 milliseconds
+
+				The 10 millisecond delay specifed for Go! Link is just the approximate delay required for the
+				data to come back from the device via USB. Go! Link actually performs the first measurement
+				immediately.
+
+				Subsequent measurements are sent at the currently configured measurement period interval. 
+				See GoIO_Sensor_SetMeasurementPeriod().
 
 				Call GoIO_Sensor_ReadRawMeasurements() to retrieve measurements from the
-				GoIO Measurement Buffer. The GoIO Measurement Buffer is guaranteed to hold up to 1200
+				GoIO Measurement Buffer. The GoIO Measurement Buffer is guaranteed to hold at least 1200
 				measurements. The buffer is circular, so if you do not service it often enough, the
 				oldest measurements in the buffer are lost. If you wish to capture all the 
 				measurements coming from the sensor, you must call GoIO_Sensor_ReadRawMeasurements()
 				often enough so that the GoIO_Sensor_GetNumMeasurementsAvailable() does not reach 1200.
+				On the other hand, we reserve the right to make the Measurement Buffer > 1200 measurements, so
+				do not assume that you can empty the buffer simply by reading in 1200 measurements.
 
 				Each of the following actions clears the GoIO Measurement Buffer:
 					1) Call GoIO_Sensor_ReadRawMeasurements() with count set to GoIO_Sensor_GetNumMeasurementsAvailable(), or
@@ -384,8 +482,8 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetNumMeasurementsAvailable(
 				GoIO Measurement Buffer. A separate GoIO Measurement Buffer is maintained for each
 				open sensor. See the description of GoIO_Sensor_GetNumMeasurementsAvailable().
 
-				Even though a raw measurement is reported as a long, it can be stored in a short 
-				integer: it ranges in value from -32768 to 32767.
+				Note that for Go! Temp and Go! Link, raw measurements range from -32768 to 32767.
+				Go! Motion raw measurements are in microns and can range into the millions.
 
 				To convert a raw measurement to a voltage use GoIO_Sensor_ConvertToVoltage().
 				To convert a voltage to a sensor specific calibrated unit, use GoIO_Sensor_CalibrateData().
@@ -428,8 +526,8 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_ReadRawMeasurements(
 				GoIO Measurement Buffer. A separate GoIO Measurement Buffer is maintained for each
 				open sensor. See the description of GoIO_Sensor_GetNumMeasurementsAvailable().
 
-				Even though a raw measurement is reported as a long, it can be stored in a short 
-				integer: it ranges in value from -32768 to 32767.
+				Note that for Go! Temp and Go! Link, raw measurements range from -32768 to 32767.
+				Go! Motion raw measurements are in microns and can range into the millions.
 
 				To convert a raw measurement to a voltage use GoIO_Sensor_ConvertToVoltage().
 				To convert a voltage to a sensor specific calibrated unit, use GoIO_Sensor_CalibrateData().
@@ -445,9 +543,10 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetLatestRawMeasurement(
 /***************************************************************************************************************************
 	Function Name: GoIO_Sensor_ConvertToVoltage()
 	
-	Purpose:	Convert a raw measurement in the range -32768 to 32767 into a voltage value.
+	Purpose:	Convert a raw measurement integer value into a real voltage value.
 				Depending on the type of sensor(see GoIO_Sensor_GetProbeType()), the voltage
-				may range from 0.0 to 5.0, or from -10.0 to 10.0 .
+				may range from 0.0 to 5.0, or from -10.0 to 10.0 . For Go! Motion, voltage returned is simply distance
+				in meters.
 
 	Return:		voltage corresponding to a specified raw measurement value.
 
@@ -475,9 +574,9 @@ GOIO_DLL_INTERFACE_DECL gtype_real64 GoIO_Sensor_CalibrateData(
 /***************************************************************************************************************************
 	Function Name: GoIO_Sensor_GetProbeType()
 	
-	Purpose:	Find out if the probe type is kProbeTypeAnalog5V or kProbeTypeAnalog10V.
+	Purpose:	Find out the probe type. See EProbeType in GSensorDDSMem.h.
 
-				This attribute is dependent on the OperationType in the SensorDDSRecord. 
+				For Go! Link devices, this attribute is dependent on the OperationType in the SensorDDSRecord. 
 				See GoIO_Sensor_DDSMem_GetOperationType().
 				If (2 == OperationType) then the sensor is kProbeTypeAnalog10V, else kProbeTypeAnalog5V.
 
@@ -487,7 +586,10 @@ GOIO_DLL_INTERFACE_DECL gtype_real64 GoIO_Sensor_CalibrateData(
 				programs do not have to deal with this, because GoIO_Sensor_Open() automatically sends
 				SKIP_CMD_ID_SET_ANALOG_INPUT_CHANNEL to the device with the appropriate parameters.
 
-	Return:		kProbeTypeAnalog5V or kProbeTypeAnalog10V.
+				Go! Temp => kProbeTypeAnalog5V.
+				Go! Motion => kProbeTypeMD.
+
+	Return:		EProbeType.
 
 ****************************************************************************************************************************/
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_GetProbeType(
@@ -513,9 +615,13 @@ data that is specific to a given sensor to be stored on the sensor. Smart sensor
 in response to the SKIP_CMD_ID_GET_SENSOR_ID command that is >= kSensorIdNumber_FirstSmartSensor. 
 
 If a sensor reports an AutoId >= kSensorIdNumber_FirstSmartSensor, then GoIO_Sensor_Open() will get the GSensorDDSRec 
-info from the sensor hardware and store in the GoIO sensor object's SensorDDSRecord.
+info from the sensor hardware and store in the GoIO sensor object's SensorDDSRecord. 
 
-AutoId capable sensors that are not smart report an AutoId value > 0 and < kSensorIdNumber_FirstSmartSensor. 
+Note that Go! Motion pretends to be smart: its id is > kSensorIdNumber_FirstSmartSensor, and GoIO_Sensor_Open() sets 
+up its GSensorDDSRec info with calibrations for meters and feet. However, there is no way to store a modified
+GSensorDDSRec record on the sensor permanently, which truly smart sensors do support.
+
+AutoId capable sensors that are not smart report an AutoId value > 0 and < kSensorIdNumber_FirstSmartSensor.
 
 Legacy (aka Dumb) sensors report an AutoId = 0.
 
@@ -542,6 +648,10 @@ the calling thread.
 				Before the record is written to the sensor, a copy of the record is marshalled into little endian format,
 				and then this copy is actually written to the sensor.
 
+				This routine sends SKIP_CMD_ID_WRITE_LOCAL_NV_MEM_*(Go! Temp) or SKIP_CMD_ID_WRITE_REMOTE_NV_MEM_*(Go! Link)
+				commands to the device. To alter DDS memory on the sensor, we recommend using 
+				GoIO_Sensor_DDSMem_WriteRecord rather than the low level SKIP_CMD_ID_WRITE commands.
+
 				WARNING: Be careful about using this routine. Changing a smart sensor's DDS memory can cause the sensor
 				to stop working with Logger Pro.
 	
@@ -552,13 +662,17 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_WriteRecord(
 	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
 	gtype_int32 timeoutMs);//[in] # of milliseconds to wait for a reply before giving up. SKIP_TIMEOUT_MS_WRITE_DDSMEMBLOCK is recommended.
 
+
 /***************************************************************************************************************************
 	Function Name: GoIO_Sensor_DDSMem_ReadRecord()
 	
 	Purpose:	Read the SensorDDSRecord from a smart sensor's DDS memory hardware. 
-
 				After the record is read from the sensor, it is unmarshalled from little endian format into processor
 				specific format.
+
+				This routine sends SKIP_CMD_ID_READ_LOCAL_NV_MEM(Go! Temp) or SKIP_CMD_ID_READ_REMOTE_NV_MEM(Go! Link)
+				commands to the device. GoIO_Sensor_Open() automatically calls this routine, so you usually do not
+				need to.
 	
 	Return:		0 if successful, 
 				else if data validation fails then -2,
@@ -569,6 +683,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_ReadRecord(
 	GOIO_SENSOR_HANDLE hSensor,	//[in] handle to open sensor.
 	gtype_int32 strictDDSValidationFlag,//[in] insist on exactly valid checksum if 1, else use a more lax validation test.
 	gtype_int32 timeoutMs);//[in] # of milliseconds to wait for a reply before giving up. SKIP_TIMEOUT_MS_READ_DDSMEMBLOCK is recommended.
+						   //Note that SKIP_TIMEOUT_MS_READ_DDSMEMBLOCK is much longer than the typical time required which is < 500 ms.
 
 /***************************************************************************************************************************
 	Function Name: GoIO_Sensor_DDSMem_SetRecord()
@@ -631,7 +746,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetMemMapVersion(
 				you might want to use GoIO_Sensor_DDSMem_SetSensorNumber() to change it.
 
 				
-	SIDE EFFECTS:	
+	SIDE EFFECTS(Go! Link only):	
 				If the new SensorDDSRecord.SensorNumber is set to kSensorIdNumber_Voltage10, then
 					SensorDDSRecord.OperationType is set = 2 to imply a probeType of kProbeTypeAnalog10V,
 				else
@@ -641,7 +756,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetMemMapVersion(
 				If the GoIO_Sensor_DDSMem_SetSensorNumber() causes the probeType to change, then you should
 				send a SKIP_CMD_ID_SET_ANALOG_INPUT_CHANNEL command to the sensor. See GoIO_Sensor_GetProbeType().
 
-	Return:		0 if hSensor is valid, else -1.
+	Return:		0 if hSensor is valid and sensor is connected to a Go! Link, else -1.
 
 ****************************************************************************************************************************/
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_SetSensorNumber(
@@ -823,7 +938,7 @@ GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetHighestValidCalPageInd
 GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_SetActiveCalPage(
 	GOIO_SENSOR_HANDLE hSensor,
 	unsigned char ActiveCalPage);
-GOIO_DLL_INTERFACE_DECL unsigned char GoIO_Sensor_DDSMem_GetActiveCalPage(
+GOIO_DLL_INTERFACE_DECL gtype_int32 GoIO_Sensor_DDSMem_GetActiveCalPage(
 	GOIO_SENSOR_HANDLE hSensor,
 	unsigned char *pActiveCalPage);
 
