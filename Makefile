@@ -74,6 +74,18 @@ vernier_lipo :
 	lipo -extract i386    bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_i386.jnilib
 	lipo -extract x86_64  bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_x86_64.jnilib
 
+vernier_nar_archives :
+	mkdir -p target/native-lib
+	rm -rf target/native-lib/*
+	cp bin/libvernier_ccsd_ppc7400.jnilib target/native-lib
+	jar cf target/vernier-goio-macosx-ppc7400-nar.jar -C target/native-lib .
+	rm -rf target/native-lib/*
+	cp bin/libvernier_ccsd_i386.jnilib target/native-lib
+	jar cf target/vernier-goio-macosx-i386-nar.jar -C target/native-lib .
+	rm -rf target/native-lib/*
+	cp bin/libvernier_ccsd_x86_64.jnilib target/native-lib
+	jar cf target/vernier-goio-macosx-x86_64-nar.jar -C target/native-lib .
+
 ######## TI targets ############
 ti_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/ti
 	$(SWIG) -java -Iinclude -package ccsd.ti -outdir src/swig/java/ccsd/ti -o src/swig/TISensorDevice_wrap.c src/swig/CCSensorDevice.i  
