@@ -358,7 +358,7 @@ int configure_sensor(GO_STATE *state, SensorConfig *request, SensorConfig *sensC
 		// populate the sensor information from the ddsRec
 		// however there still needs to be a mapping from
 		// the native id to the cc quantity id
-		sprintf(sensConfig->name, ddsRec.SensorLongName);
+		sprintf(sensConfig->name,"%s", ddsRec.SensorLongName);
 		state->calibrationFunct = NULL;
 		switch(ddsRec.SensorNumber){
 			case SENSOR_ID_BAROMETER:
@@ -443,7 +443,7 @@ int configure_sensor(GO_STATE *state, SensorConfig *request, SensorConfig *sensC
 			 		(request->type == QUANTITY_RELATIVE_HUMIDITY)){
 			 			valid = 1;
 			 	}
-			 	sprintf(sensConfig->unitStr, "%RH");
+			 	sprintf(sensConfig->unitStr, "%s", "%RH");
 			 	sensConfig->type = QUANTITY_RELATIVE_HUMIDITY;
 			 	sensConfig->stepSize = 0.1;
 			 	break;
@@ -452,7 +452,7 @@ int configure_sensor(GO_STATE *state, SensorConfig *request, SensorConfig *sensC
 			 		(request->type == QUANTITY_COLORIMETER)){
 			 			valid = 1;
 			 	}
-			 	sprintf(sensConfig->unitStr, "%T");
+			 	sprintf(sensConfig->unitStr, "%s", "%T");
 			 	sensConfig->type = QUANTITY_COLORIMETER;
 			 	sensConfig->stepSize = 0.057;
 			 	break;
@@ -740,7 +740,7 @@ int configure_sensor(GO_STATE *state, SensorConfig *request, SensorConfig *sensC
 			switch(request->type){
 			case QUANTITY_RELATIVE_HUMIDITY:
 				valid = 1;
-				sprintf(sensConfig->unitStr, "%RH");
+				sprintf(sensConfig->unitStr, "%s", "%RH");
 				sprintf(sensConfig->name, "Relative Humidity");
 				sensConfig->type = QUANTITY_RELATIVE_HUMIDITY;			
 				sensConfig->stepSize = 0.04;
@@ -836,7 +836,7 @@ void open_go(GO_STATE *state)
 		return;
 	}
 
-	printf("  goHandle: %d\n", goHandle);
+	printf("  goHandle: %p\n", goHandle);
 		
 	state->goHandle = goHandle;
 	state->deviceType = devType;
@@ -927,7 +927,7 @@ int SensDev_start(SENSOR_DEVICE_HANDLE hDevice)
 	printf("SensDev_start\n");
 	GO_STATE *state = (GO_STATE *)hDevice; 
 
-	printf("  goHandle %d\n", state->goHandle);
+	printf("  goHandle %p\n", state->goHandle);
 
 	int err;
 	
