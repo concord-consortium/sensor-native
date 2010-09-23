@@ -47,7 +47,7 @@ nativelib/%.o : src/c/%.c include/CCSensorDevice.h nativelib nativelib/test
 bin bin/local nativelib nativelib/test nativelib/swig $(SWIG_OUTPUT_DIR)/ccsd/vernier $(SWIG_OUTPUT_DIR)/ccsd/pseudo $(SWIG_OUTPUT_DIR)/ccsd/ti:
 	mkdir -p $@
 
-.PHONY : vernier_swig ti_swig pseudo_swig vernier_lipo
+.PHONY : vernier_swig vernier_mac_jnilib vernier_mac_lipo vernier_mac_nar_archives ti_swig pseudo_swig
 
 # you must install swig to run this target. http://swig.org
 # it expects the binary to be on your path and the include files to
@@ -69,21 +69,29 @@ bin/GoLinkQuery : $(QUERY_OBJS) $(GOLINK_OBJS) bin
 bin/GoLinkPrintData : $(GOLINK_OBJS) $(PRINTDATA_OBJS) bin
 	$(build-static-executable)
 
-vernier_lipo : 
-	lipo -extract ppc7400 bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_ppc7400.jnilib
-	lipo -extract i386    bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_i386.jnilib
-	lipo -extract x86_64  bin/local/libvernier_ccsd.jnilib -output bin/libvernier_ccsd_x86_64.jnilib
+vernier_mac_jnilib :
+	g++ -mmacosx-version-min=10.4 -Iinclude -Ivernier_goio_sdk -DTARGET_OS_MAC -arch i386 -arch ppc -arch x86_64 -c src/swig/VernierSensorDevice_wrap.c -I/System/Library/Frameworks/JavaVM.framework/Headers -Iinclude -o nativelib/swig/VernierSensorDevice_wrap.o
+	g++ -mmacosx-version-min=10.4 -Iinclude -Ivernier_goio_sdk -DTARGET_OS_MAC -arch i386 -arch ppc -arch x86_64 -c src/c/GoLinkSensorDevice.c -I/System/Library/Frameworks/JavaVM.framework/Headers -Iinclude -o nativelib/GoLinkSensorDevice.o
+	g++ -mmacosx-version-min=10.4 -bundle nativelib/GoLinkSensorDevice.o nativelib/swig/VernierSensorDevice_wrap.o vernier_goio_sdk/libGoIO_DLL.a -o bin/local/libvernier_ccsd.jnilib -framework JavaVM -bind_at_load -framework IOKit -framework Cocoa -framework Carbon -lstdc++ -I/System/Library/Frameworks/JavaVM.framework/Headers -arch i386 -arch ppc -arch x86_64
+	
+vernier_mac_lipo : 
+	mkdir -p bin/ppc7400
+	mkdir -p bin/i386
+	mkdir -p bin/x86_64
+	lipo -extract ppc7400 bin/local/libvernier_ccsd.jnilib -output bin/ppc7400/libvernier_ccsd.jnilib
+	lipo -extract i386    bin/local/libvernier_ccsd.jnilib -output bin/i386/libvernier_ccsd.jnilib
+	lipo -extract x86_64  bin/local/libvernier_ccsd.jnilib -output bin/x86_64/libvernier_ccsd.jnilib
 
-vernier_nar_archives :
+vernier_mac_nar_archives :
 	mkdir -p target/native-lib
 	rm -rf target/native-lib/*
-	cp bin/libvernier_ccsd_ppc7400.jnilib target/native-lib
-	jar cf target/vernier-goio-macosx-ppc7400-nar.jar -C target/native-lib .
+	cp bin/ppc7400/libvernier_ccsd.jnilib target/native-lib
+	jar cf target/vernier-goio-macosx-ppc-nar.jar -C target/native-lib .
 	rm -rf target/native-lib/*
-	cp bin/libvernier_ccsd_i386.jnilib target/native-lib
+	cp bin/i386/libvernier_ccsd.jnilib target/native-lib
 	jar cf target/vernier-goio-macosx-i386-nar.jar -C target/native-lib .
 	rm -rf target/native-lib/*
-	cp bin/libvernier_ccsd_x86_64.jnilib target/native-lib
+	cp bin/x86_64/libvernier_ccsd.jnilib target/native-lib
 	jar cf target/vernier-goio-macosx-x86_64-nar.jar -C target/native-lib .
 
 ######## TI targets ############
