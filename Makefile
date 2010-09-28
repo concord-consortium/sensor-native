@@ -26,7 +26,9 @@ endef
 # this builds a jni comptable dll with gcc
 # this filter grabs the .o and .lib files from the dependency list
 define build-jni-dll
-$(CC) -bundle $(filter %.o %.lib %.a,$^) -o $@ -framework JavaVM $(OSX_LINK_FLAGS)
+g++ -shared $(filter %.o %.lib,$^) -Wl,--add-stdcall-alias -o $@
+
+# $(CC) -bundle $(filter %.o %.lib %.a,$^) -o $@ -framework JavaVM $(OSX_LINK_FLAGS)
 #gcc -bundle $(filter %.o %.lib %.dylib,$^) -o $@ -framework JavaVM
 endef
 
