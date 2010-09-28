@@ -3,8 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define _MAX_PATH 256
-
+#ifndef _MAX_PATH
+  #define _MAX_PATH 256
+#endif
 
 #define assert(condition) (condition) ? 0 : \
 	printf("assert: %s: line: %d", "condition",__LINE__)
