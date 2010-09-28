@@ -94,6 +94,19 @@ vernier_mac_nar_archives :
 	cp bin/x86_64/libvernier_ccsd.jnilib target/native-lib
 	jar cf target/vernier-goio-macosx-x86_64-nar.jar -C target/native-lib .
 
+vernier_windows_jnilib :
+	g++ -DTARGET_OS_WIN -Iinclude -Ivernier_goio_sdk -I/c/Program\ Files/Java/jdk1.6.0_21/include/win32 -I/c/Program\ Files/Java/jdk1.6.0_21/include -c src/swig/VernierSensorDevice_wrap.c -o nativelib/swig/VernierSensorDevice_wrap.o
+	g++ -DTARGET_OS_WIN -Iinclude -Ivernier_goio_sdk -I/c/Program\ Files/Java/jdk1.6.0_21/include/win32 -I/c/Program\ Files/Java/jdk1.6.0_21/include -c src/c/GoLinkSensorDevice.c -o nativelib/GoLinkSensorDevice.o
+	g++ -shared nativelib/GoLinkSensorDevice.o nativelib/swig/VernierSensorDevice_wrap.o vernier_goio_sdk/GoIO_DLL.lib -Wl--add-stdcall-alias -o bin/local/vernier_ccsd.dll
+
+vernier_windows_nar_archives :
+	mkdir -p target/native-lib
+	rm -rf target/native-lib/*
+	cp bin/local/vernier_ccsd.dll target/native-lib
+	cp vernier_goio_sdk/GoIO_DLL.dll target/native-lib
+	jar cf target/vernier-goio-win32-nar.jar -C target/native-lib .
+
+
 ######## TI targets ############
 ti_swig : include/CCSensorDevice.h src/swig/CCSensorDevice.i $(SWIG_OUTPUT_DIR)/ccsd/ti
 	$(SWIG) -java -Iinclude -package ccsd.ti -outdir src/swig/java/ccsd/ti -o src/swig/TISensorDevice_wrap.c src/swig/CCSensorDevice.i  
