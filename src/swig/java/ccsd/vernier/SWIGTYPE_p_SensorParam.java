@@ -32,49 +32,19 @@
 package ccsd.vernier;
 
 
-public class SensorParam {
+public class SWIGTYPE_p_SensorParam {
   private long swigCPtr;
-  protected boolean swigCMemOwn;
 
-  protected SensorParam(long cPtr, boolean cMemoryOwn) {
-    swigCMemOwn = cMemoryOwn;
+  protected SWIGTYPE_p_SensorParam(long cPtr, boolean bFutureUse) {
     swigCPtr = cPtr;
   }
 
-  protected void finalize() {
-    delete();
-  }
-
-  public void delete() {
-    if(swigCPtr != 0 && swigCMemOwn) {
-      swigCMemOwn = false;
-      NativeBridgeJNI.delete_SensorParam(swigCPtr);
-    }
+  protected SWIGTYPE_p_SensorParam() {
     swigCPtr = 0;
   }
 
-  protected static long getCPtr(SensorParam obj) {
+  protected static long getCPtr(SWIGTYPE_p_SensorParam obj) {
     return (obj == null) ? 0 : obj.swigCPtr;
   }
-
-  public void setKey(String key) {
-    NativeBridgeJNI.set_SensorParam_key(swigCPtr, key);
-  }
-
-  public String getKey() {
-    return NativeBridgeJNI.get_SensorParam_key(swigCPtr);
-  }
-
-  public void setValue(String value) {
-    NativeBridgeJNI.set_SensorParam_value(swigCPtr, value);
-  }
-
-  public String getValue() {
-    return NativeBridgeJNI.get_SensorParam_value(swigCPtr);
-  }
-
-  public SensorParam() {
-    this(NativeBridgeJNI.new_SensorParam(), true);
-  }
-
 }
+
