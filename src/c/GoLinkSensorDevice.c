@@ -266,6 +266,9 @@ int SensDev_getCurrentConfig(
 		case GoDeviceType_GoTemp:
 			sprintf(expConfig->deviceName,"GoTempSensorDevice");
 			break;
+		case GoDeviceType_GoMotion:
+			sprintf(expConfig->deviceName,"GoMotionSensorDevice");
+			break;
 		default:
 			sprintf(expConfig->deviceName, "Unknown device type");
 	}
