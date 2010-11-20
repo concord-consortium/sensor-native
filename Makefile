@@ -85,16 +85,17 @@ vernier_mac_lipo :
 	lipo -extract x86_64  bin/local/libvernier_ccsd.jnilib -output bin/x86_64/libvernier_ccsd.jnilib
 
 vernier_mac_nar_archives :
-	mkdir -p target/native-lib
-	rm -rf target/native-lib/*
-	cp bin/ppc7400/libvernier_ccsd.jnilib target/native-lib
-	jar cf target/vernier-goio-macosx-ppc-nar.jar -C target/native-lib .
-	rm -rf target/native-lib/*
-	cp bin/i386/libvernier_ccsd.jnilib target/native-lib
-	jar cf target/vernier-goio-macosx-i386-nar.jar -C target/native-lib .
-	rm -rf target/native-lib/*
-	cp bin/x86_64/libvernier_ccsd.jnilib target/native-lib
-	jar cf target/vernier-goio-macosx-x86_64-nar.jar -C target/native-lib .
+	mkdir -p native-archives/native-lib
+	rm -rf native-archives/native-lib/*
+	cp bin/ppc7400/libvernier_ccsd.jnilib native-archives/native-lib
+	jar cf native-archives/vernier-goio-macosx-ppc-nar.jar -C native-archives/native-lib .
+	rm -rf native-archives/native-lib/*
+	cp bin/i386/libvernier_ccsd.jnilib native-archives/native-lib
+	jar cf native-archives/vernier-goio-macosx-i386-nar.jar -C native-archives/native-lib .
+	rm -rf native-archives/native-lib/*
+	cp bin/x86_64/libvernier_ccsd.jnilib native-archives/native-lib
+	jar cf native-archives/vernier-goio-macosx-x86_64-nar.jar -C native-archives/native-lib .
+	rm -rf native-archives/native-lib
 
 vernier_windows_jnilib :
 	g++ -DTARGET_OS_WIN -Iinclude -Ivernier_goio_sdk -I/c/Program\ Files/Java/jdk1.6.0_21/include/win32 -I/c/Program\ Files/Java/jdk1.6.0_21/include -c src/swig/VernierSensorDevice_wrap.c -o nativelib/swig/VernierSensorDevice_wrap.o
@@ -102,11 +103,11 @@ vernier_windows_jnilib :
 	g++ -shared nativelib/GoLinkSensorDevice.o nativelib/swig/VernierSensorDevice_wrap.o vernier_goio_sdk/GoIO_DLL.lib -Wl--add-stdcall-alias -o bin/local/vernier_ccsd.dll
 
 vernier_windows_nar_archives :
-	mkdir -p target/native-lib
-	rm -rf target/native-lib/*
-	cp bin/local/vernier_ccsd.dll target/native-lib
-	cp vernier_goio_sdk/GoIO_DLL.dll target/native-lib
-	jar cf target/vernier-goio-win32-nar.jar -C target/native-lib .
+	mkdir -p native-archives/native-lib
+	rm -rf native-archives/native-lib/*
+	cp bin/local/vernier_ccsd.dll native-archives/native-lib
+	cp vernier_goio_sdk/GoIO_DLL.dll native-archives/native-lib
+	jar cf native-archives/vernier-goio-win32-nar.jar -C native-archives/native-lib .
 
 
 ######## TI targets ############
